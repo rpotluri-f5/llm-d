@@ -23,24 +23,22 @@ fi
 
 DOWNLOAD_ARCH=$(get_download_arch)
 
-# install jq first (required to parse package mappings)
-if [ "$TARGETOS" = "ubuntu" ]; then
-    apt-get update -qq
-    apt-get install -y jq
-elif [ "$TARGETOS" = "rhel" ]; then
+# install yq (required to parse package yaml manifests)
+install_yq
+if [ "$TARGETOS" = "rhel" ]; then
     dnf -q update -y
-    dnf -q install -y jq
+    ensure_registered
 fi
 
 # main installation logic
 if [ "$TARGETOS" = "ubuntu" ]; then
     setup_ubuntu_repos
-    mapfile -t INSTALL_PKGS < <(load_layered_packages ubuntu "builder-packages.json" "cuda")
+    mapfile -t INSTALL_PKGS < <(load_layered_packages ubuntu "builder-packages.yaml" "cuda")
     install_packages ubuntu "${INSTALL_PKGS[@]}"
     cleanup_packages ubuntu
 elif [ "$TARGETOS" = "rhel" ]; then
     setup_rhel_repos "$DOWNLOAD_ARCH"
-    mapfile -t INSTALL_PKGS < <(load_layered_packages rhel "builder-packages.json" "cuda")
+    mapfile -t INSTALL_PKGS < <(load_layered_packages rhel "builder-packages.yaml" "cuda")
     install_packages rhel "${INSTALL_PKGS[@]}"
     
     # if using efa, we already installed hwloc as part of base RPMs

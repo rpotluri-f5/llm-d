@@ -5,6 +5,33 @@
 # - CUDA_MAJOR: CUDA major version (e.g., 12)
 # - CUDA_MINOR: CUDA minor version (e.g., 9)
 # - PYTHON_VERSION: Python version (e.g., 3.12)
+# Optional docker secret mounts:
+# - /run/secrets/subman_org: Subscription Manager Organization - used if on a ubi based image for entitlement
+# - /run/secrets/subman_activation_key: Subscription Manager Activation key - used if on a ubi based image for entitlement
+
+# Assumes rhel check in consuming script
+ensure_registered() {
+  install -d -m0755 /etc/pki/consumer /etc/pki/entitlement /etc/rhsm
+  subscription-manager clean || true
+  if [ ! -f /etc/pki/consumer/cert.pem ]; then
+    test -f /run/secrets/subman_org && test -f /run/secrets/subman_activation_key
+    subscription-manager register \
+      --org "$(cat /run/secrets/subman_org)" \
+      --activationkey "$(cat /run/secrets/subman_activation_key)" \
+      --force
+    subscription-manager refresh || true
+  fi
+}
+
+# Assumes rhel check in consuming script
+ensure_unregistered() {
+  echo "beginning un-registration process"
+  if [ -f /etc/pki/consumer/cert.pem ]; then
+    subscription-manager unregister || true
+  fi
+  subscription-manager clean || true
+  rm -rf /etc/pki/entitlement/* /etc/pki/consumer/* /etc/rhsm/* /var/cache/dnf/* || true
+}
 
 # detect architecture for repo URLs
 get_download_arch() {
@@ -24,10 +51,10 @@ get_download_arch() {
     esac
 }
 
-# expand environment variables in json string
+# expand environment variables in yaml string
 expand_vars() {
-    local json="$1"
-    echo "$json" | sed "s/\${PYTHON_VERSION}/${PYTHON_VERSION}/g; \
+    local yaml="$1"
+    echo "$yaml" | sed "s/\${PYTHON_VERSION}/${PYTHON_VERSION}/g; \
                         s/\${CUDA_MAJOR}/${CUDA_MAJOR}/g; \
                         s/\${CUDA_MINOR}/${CUDA_MINOR}/g"
 }
@@ -116,10 +143,19 @@ autoremove_packages() {
     fi
 }
 
-# load package list from json mappings
-# usage: load_packages_from_json <os> <manifest_json> <section_key>
+# install yq binary (mikefarah/yq) for yaml parsing
+install_yq() {
+    local yq_version="v4.44.1"
+    local yq_arch
+    yq_arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+    wget -qO /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/${yq_version}/yq_linux_${yq_arch}"
+    chmod +x /usr/local/bin/yq
+}
+
+# load package list from yaml mappings
+# usage: load_packages_from_yaml <os> <manifest_yaml> <section_key>
 # returns: array of package names for the target os
-load_packages_from_json() {
+load_packages_from_yaml() {
     local os="$1"
     local manifest="$2"
     local section="${3:-rhel_to_ubuntu}"
@@ -130,25 +166,25 @@ load_packages_from_json() {
         # get ubuntu packages from mappings (skip null values)
         while IFS= read -r pkg; do
             [ -n "$pkg" ] && packages+=("$pkg")
-        done < <(echo "$manifest" | jq -r ".${section} | to_entries[] | select(.value != null) | .value")
+        done < <(echo "$manifest" | yq -r ".${section} | to_entries | .[] | select(.value | . == null | not) | .value")
 
         # add ubuntu-only packages if they exist
-        if echo "$manifest" | jq -e '.ubuntu_only' > /dev/null 2>&1; then
+        if echo "$manifest" | yq -e '.ubuntu_only' > /dev/null 2>&1; then
             while IFS= read -r pkg; do
-                packages+=("$pkg")
-            done < <(echo "$manifest" | jq -r '.ubuntu_only[]')
+                [ -n "$pkg" ] && packages+=("$pkg")
+            done < <(echo "$manifest" | yq -r '.ubuntu_only[]')
         fi
     elif [ "$os" = "rhel" ]; then
-        # use rhel package names directly from json keys
+        # use rhel package names directly from yaml keys
         while IFS= read -r pkg; do
             packages+=("$pkg")
-        done < <(echo "$manifest" | jq -r ".${section} | keys[]")
+        done < <(echo "$manifest" | yq -r ".${section} | keys | .[]")
     fi
 
     printf '%s\n' "${packages[@]}"
 }
 
-# load packages from json file with variable expansion
+# load packages from yaml file with variable expansion
 # usage: load_and_expand_packages <os> <mappings_file>
 # returns: package names (one per line) for the target os
 load_and_expand_packages() {
@@ -159,24 +195,24 @@ load_and_expand_packages() {
     manifest=$(cat "$mappings_file")
     manifest_expanded=$(expand_vars "$manifest")
 
-    load_packages_from_json "$os" "$manifest_expanded"
+    load_packages_from_yaml "$os" "$manifest_expanded"
 }
 
-# merge two json package manifests (accelerator overrides common)
-# usage: merge_package_manifests <common_json> <accelerator_json>
-# returns: merged json manifest
+# merge two yaml package manifests (accelerator overrides common)
+# usage: merge_package_manifests <common_yaml> <accelerator_yaml>
+# returns: merged yaml manifest
 merge_package_manifests() {
     local common="$1"
     local accelerator="$2"
 
-    # use jq to deeply merge the two manifests
+    # use yq to deeply merge the two manifests
     # accelerator packages override common ones with same key
-    jq -s '.[0] * .[1]' <(echo "$common") <(echo "$accelerator")
+    yq eval-all 'select(fi == 0) * select(fi == 1)' <(echo "$common") <(echo "$accelerator")
 }
 
 # load and merge packages from common + accelerator-specific locations
 # usage: load_layered_packages <os> <package_type> <accelerator>
-# package_type: "builder-packages.json" or "runtime-packages.json"
+# package_type: "builder-packages.yaml" or "runtime-packages.yaml"
 # accelerator: "cuda", "xpu", "hpu", etc.
 # returns: package names (one per line) for the target os
 # if no accelerator is passed only the common manifests will be used
@@ -226,5 +262,5 @@ load_layered_packages() {
     fi
 
     # extract package list for target OS
-    load_packages_from_json "$os" "$merged_manifest"
+    load_packages_from_yaml "$os" "$merged_manifest"
 }

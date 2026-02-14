@@ -1,0 +1,67 @@
+# Common builder package mappings from RHEL to Ubuntu
+# Shared across all accelerator types (cuda, xpu, hpu, cpu)
+# Accelerator-specific files override/extend these via load_layered_packages
+#
+# Key: RHEL package name
+# Value: Ubuntu package name (null = RHEL-only, no Ubuntu equivalent)
+
+rhel_to_ubuntu:
+  # Python build toolchain
+  python${PYTHON_VERSION}: null
+  python${PYTHON_VERSION}-pip: null
+  python${PYTHON_VERSION}-wheel: null
+  python${PYTHON_VERSION}-devel: null
+
+  # Python 3.9 (secondary version used for tooling)
+  python3.9: python3.9
+  python3.9-pip: python3.9-venv
+  python3.9-wheel: python3-wheel
+  python3.9-devel: python3.9-dev
+
+  # Core system utilities
+  procps: procps
+  findutils: findutils
+
+  # Compilers and build tools
+  gcc: gcc
+  gcc-c++: g++
+  make: make
+  autoconf: autoconf
+  automake: automake
+  libtool: libtool
+  ninja-build: ninja-build
+  pkg-config: pkg-config
+
+  # SCM
+  git: git
+
+  # Development libraries
+  zlib-devel: zlib1g-dev
+  openssl-devel: libssl-dev
+  libuuid-devel: uuid-dev
+  glibc-devel: null
+
+  # RDMA / InfiniBand
+  rdma-core-devel: librdmacm-dev
+  libibverbs: libibverbs1
+  libibverbs-devel: libibverbs-dev
+
+  # NUMA
+  numactl-libs: libnuma1
+
+  # Misc
+  subunit: null
+  pciutils: pciutils
+  pciutils-libs: null
+  xz: xz-utils
+  rsync: rsync
+
+# Packages only needed on Ubuntu (no RHEL equivalent needed)
+ubuntu_only:
+  - debhelper
+  - environment-modules
+  - tcl
+  - ethtool
+  - iproute2
+  - dmidecode
+  - udev

@@ -1,0 +1,28 @@
+# CUDA-specific runtime package mappings
+# These are merged on top of common/runtime-packages.yaml
+
+rhel_to_ubuntu:
+  # CUDA compiler and runtime tools
+  cuda-nvcc-${CUDA_MAJOR}-${CUDA_MINOR}: cuda-nvcc-${CUDA_MAJOR}-${CUDA_MINOR}
+  cuda-nvrtc-${CUDA_MAJOR}-${CUDA_MINOR}: cuda-nvrtc-${CUDA_MAJOR}-${CUDA_MINOR}
+  cuda-cudart-devel-${CUDA_MAJOR}-${CUDA_MINOR}: cuda-cudart-dev-${CUDA_MAJOR}-${CUDA_MINOR}
+
+  # Python
+  python${PYTHON_VERSION}: python${PYTHON_VERSION}
+  python${PYTHON_VERSION}-pip: python${PYTHON_VERSION}-venv
+  python${PYTHON_VERSION}-devel: python${PYTHON_VERSION}-dev
+
+  # System
+  numactl-libs: libnuma1
+  procps-ng: procps
+  git: git
+  libatomic: libatomic1
+  libaio: null
+  libxcb: libxcb1
+  libxcb-devel: libxcb1-dev
+
+# Packages only needed on Ubuntu
+ubuntu_only:
+  - hwloc
+  - libhwloc15
+  - curl

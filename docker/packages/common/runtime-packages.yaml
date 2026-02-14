@@ -1,0 +1,20 @@
+# Common runtime package mappings from RHEL to Ubuntu
+# Shared across all accelerator types (cuda, xpu, hpu, cpu)
+# Accelerator-specific files override/extend these via load_layered_packages
+#
+# Key: RHEL package name
+# Value: Ubuntu package name (null = RHEL-only, no Ubuntu equivalent)
+
+rhel_to_ubuntu:
+  # Python runtime
+  python${PYTHON_VERSION}: python${PYTHON_VERSION}
+  python${PYTHON_VERSION}-pip: python${PYTHON_VERSION}-venv
+  python${PYTHON_VERSION}-devel: python${PYTHON_VERSION}-dev
+
+  # System utilities
+  procps-ng: procps
+  git: git
+
+  # Runtime libraries
+  libatomic: libatomic1
+  libaio: null
