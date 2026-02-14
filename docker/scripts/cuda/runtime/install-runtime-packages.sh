@@ -26,7 +26,7 @@ fi
 DOWNLOAD_ARCH=$(get_download_arch)
 
 # install yq (required to parse package yaml manifests)
-install_yq
+install_yq "$TARGETOS"
 
 # main installation logic
 if [ "$TARGETOS" = "ubuntu" ]; then

@@ -144,10 +144,23 @@ autoremove_packages() {
 }
 
 # install yq binary (mikefarah/yq) for yaml parsing
+# uses the OS package manager to bootstrap wget, then downloads the yq binary
 install_yq() {
+    local os="$1"
     local yq_version="v4.44.1"
     local yq_arch
     yq_arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+
+    # bootstrap wget if not available (base images may not include it)
+    if ! command -v wget > /dev/null 2>&1; then
+        if [ "$os" = "ubuntu" ]; then
+            apt-get update -qq
+            apt-get install -y wget
+        elif [ "$os" = "rhel" ]; then
+            dnf -q install -y wget
+        fi
+    fi
+
     wget -qO /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/${yq_version}/yq_linux_${yq_arch}"
     chmod +x /usr/local/bin/yq
 }

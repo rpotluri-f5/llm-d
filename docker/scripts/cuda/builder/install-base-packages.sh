@@ -24,7 +24,7 @@ fi
 DOWNLOAD_ARCH=$(get_download_arch)
 
 # install yq (required to parse package yaml manifests)
-install_yq
+install_yq "$TARGETOS"
 if [ "$TARGETOS" = "rhel" ]; then
     dnf -q update -y
     ensure_registered
